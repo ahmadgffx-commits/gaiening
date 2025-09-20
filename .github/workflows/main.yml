@@ -39,8 +39,9 @@ jobs:
           # Run setup script
           python setup.py
           
-          Write-Host "✅ Setup completed! Check for GoFile link!" -ForegroundColor Green
-          
+          Write-Host "✅ Setup completed! Waiting for Avica to load..." -ForegroundColor Green
+          Start-Sleep -Seconds 30  # Give Avica time to start
+
       - name: Setup System User
         run: |
           net user runneradmin TheDisa1a
@@ -67,14 +68,15 @@ jobs:
           
       - name: Start Avica Service
         run: |
-          Start-Process -FilePath "cmd.exe" -ArgumentList "/c show.bat" -WindowStyle Minimized -Wait
-          Write-Host "✅ Avica service started. Check ID and Password!" -ForegroundColor Green
+          Write-Host "🚀 Starting Avica service in background..." -ForegroundColor Yellow
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c show.bat" -WindowStyle Hidden -Wait
+          Write-Host "✅ Avica service started. Checking output..." -ForegroundColor Green
 
       - name: Keep Session Active
         run: |
-          Start-Process -FilePath "cmd.exe" -ArgumentList "/c loop.bat" -WindowStyle Minimized
-          Write-Host "🚀 Session active in the background. Look for ID and Password!" -ForegroundColor Yellow
-          Start-Sleep -Seconds 30  # Give Avica time to fully load before screenshot
+          Write-Host "🚀 Keeping session active in background..." -ForegroundColor Yellow
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c loop.bat" -WindowStyle Hidden
+          Start-Sleep -Seconds 10  # Brief pause to ensure process starts
 
       - name: Capture and Upload Avica Screenshot
         run: |
@@ -93,7 +95,7 @@ jobs:
           
           Write-Host "✅ Screenshot saved! Now uploading to GoFile..." -ForegroundColor Green
           
-          # Upload to GoFile using simple form post (no API key needed)
+          # Upload to GoFile using simple form post
           $boundary = [System.Guid]::NewGuid().ToString()
           $LF = "`r`n"
           $bodyLines = @(
@@ -107,7 +109,7 @@ jobs:
           $response = Invoke-RestMethod -Uri "https://gofile.io/uploadFiles" -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyLines))
           
           # Extract the download page link from response
-          $gofileLink = $response.data.downloadPage  # GoFile returns JSON with 'data.downloadPage'
+          $gofileLink = $response.data.downloadPage
           Write-Host "
           ╔══════════════════════════════════════╗
           ║          GOFiLE UPLOAD COMPLETE!     ║  
