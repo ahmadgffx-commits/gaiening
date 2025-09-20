@@ -66,9 +66,57 @@ jobs:
           " -ForegroundColor Cyan
           
       - name: Start Avica Service
-        run: cmd /c show.bat
-        
+        run: |
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c show.bat" -WindowStyle Minimized -Wait
+          Write-Host "✅ Avica service started. Check ID and Password!" -ForegroundColor Green
+
       - name: Keep Session Active
         run: |
-          Write-Host "🚀 Avica is starting... Look for CONNECTION ID below!" -ForegroundColor Yellow
-          cmd /c loop.bat
+          Start-Process -FilePath "cmd.exe" -ArgumentList "/c loop.bat" -WindowStyle Minimized
+          Write-Host "🚀 Session active in the background. Look for ID and Password!" -ForegroundColor Yellow
+          Start-Sleep -Seconds 30  # Give Avica time to fully load before screenshot
+
+      - name: Capture and Upload Avica Screenshot
+        run: |
+          Write-Host "📸 Taking screenshot of Avica window..." -ForegroundColor Yellow
+          
+          # Take screenshot of full screen (captures Avica cleanly)
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen(0, 0, 0, 0, $screen.Size)
+          $graphics.Dispose()
+          $bitmap.Save("avica_screenshot.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $bitmap.Dispose()
+          
+          Write-Host "✅ Screenshot saved! Now uploading to GoFile..." -ForegroundColor Green
+          
+          # Upload to GoFile using simple form post (no API key needed)
+          $boundary = [System.Guid]::NewGuid().ToString()
+          $LF = "`r`n"
+          $bodyLines = @(
+              "--$boundary",
+              "Content-Disposition: form-data; name=`"file`"; filename=`"avica_screenshot.png`"$LF",
+              "Content-Type: image/png$LF$LF",
+              [System.IO.File]::ReadAllBytes("avica_screenshot.png") -join $LF,
+              "--$boundary--$LF"
+          ) -join $LF
+          
+          $response = Invoke-RestMethod -Uri "https://gofile.io/uploadFiles" -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyLines))
+          
+          # Extract the download page link from response
+          $gofileLink = $response.data.downloadPage  # GoFile returns JSON with 'data.downloadPage'
+          Write-Host "
+          ╔══════════════════════════════════════╗
+          ║          GOFiLE UPLOAD COMPLETE!     ║  
+          ╚══════════════════════════════════════╝
+          
+          🔗 GoFile Link: $gofileLink
+          
+          📋 Instructions:
+          • Click the link to view/download the screenshot
+          • Get your fresh Avica ID & Password from the image
+          • Connect via Avica app – new creds every 6 hours!
+          " -ForegroundColor Cyan
